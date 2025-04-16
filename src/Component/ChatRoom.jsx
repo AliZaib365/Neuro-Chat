@@ -87,7 +87,7 @@ export function ChatRoom() {
     const fetchUserData = async () => {
       const uniqueUserIds = [...new Set(messages.map(msg => msg.uid))];
       const userData = {};
-  
+
       for (const uid of uniqueUserIds) {
         try {
           const docSnap = await getDoc(doc(db, "users", uid));
@@ -98,10 +98,10 @@ export function ChatRoom() {
           console.error("Error fetching user data:", error);
         }
       }
-  
+
       setUserDocs(prev => ({ ...prev, ...userData }));
     };
-  
+
     if (messages.length > 0) fetchUserData();
   }, [messages]);
   // Check browser support for audio formats
@@ -781,18 +781,16 @@ export function ChatRoom() {
                       </svg>
                     )}
                     <img
-                      src={
-                        userDocs[message.uid]?.data()?.photoURL || // Current profile picture from Firestore
-                        message.photoURL ||                        // Fallback to message's original photoURL
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(message.displayName || "U")}&background=random`
-                      }
+                      src={userDocs[message.uid]?.data()?.photoURL}
                       alt="User profile"
                       className={`w-5 h-5 rounded-full object-cover border-2 ${message.uid === user.uid ? "border-blue-500" : "border-gray-300"
                         }`}
                       onError={(e) => {
-                        e.target.src = "https://ui-avatars.com/api/?name=U&background=random";
+                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(message.displayName || "U")
+                          }&background=random`;
                       }}
-                    />  
+                      loading="lazy"
+                    />
                   </div>
                 </div>
               </div>
