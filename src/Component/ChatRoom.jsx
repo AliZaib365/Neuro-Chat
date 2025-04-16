@@ -758,14 +758,14 @@ export function ChatRoom() {
                     )}
                     <img
                       src={
-                        message.photoURL ||
-                        "https://ui-avatars.com/api/?name=" +
-                        encodeURIComponent(message.displayName || "U") +
-                        "&background=random"
+                        profilePicUrl || // This will show the Base64 image if available
+                        auth.currentUser?.photoURL || // Fallback to auth photoURL
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                          userFullName || "U"
+                        )}&background=random`
                       }
                       alt="User profile"
-                      className={`w-5 h-5 rounded-full object-cover border-2 ${message.uid === user.uid ? "border-blue-500" : "border-gray-300"
-                        }`}
+                      className="w-8 h-8 rounded-full border border-gray-200"
                       onError={(e) => {
                         e.target.src =
                           "https://ui-avatars.com/api/?name=U&background=random";
