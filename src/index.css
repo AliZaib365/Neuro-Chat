@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* Light grey thin scrollbar */
+::-webkit-scrollbar {
+    width: 4px; /* Thin scrollbar */
+    height: 4px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background-color: #d1d5db; /* light grey (like Tailwind's gray-300) */
+    border-radius: 9999px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #a1a1aa; /* slightly darker on hover (gray-400) */
+  }
+  
