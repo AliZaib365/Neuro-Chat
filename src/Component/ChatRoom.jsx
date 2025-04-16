@@ -34,6 +34,7 @@ export function ChatRoom() {
   };
 
   // State management
+  const [userDocs, setUserDocs] = useState({}); // Add this with your other state declarations
   const [userFullName, setUserFullName] = useState("");
   const [profilePicUrl, setProfilePicUrl] = useState("");
   const [user, loading] = useAuthState(auth);
@@ -82,7 +83,27 @@ export function ChatRoom() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const uniqueUserIds = [...new Set(messages.map(msg => msg.uid))];
+      const userData = {};
+  
+      for (const uid of uniqueUserIds) {
+        try {
+          const docSnap = await getDoc(doc(db, "users", uid));
+          if (docSnap.exists()) {
+            userData[uid] = docSnap;
+          }
+        } catch (error) {
+          console.error("Error fetching user data:", error);
+        }
+      }
+  
+      setUserDocs(prev => ({ ...prev, ...userData }));
+    };
+  
+    if (messages.length > 0) fetchUserData();
+  }, [messages]);
   // Check browser support for audio formats
   useEffect(() => {
     const checkBrowserSupport = () => {
@@ -492,6 +513,12 @@ export function ChatRoom() {
     if (newMessage.trim() === "" && !audioURL) return;
 
     try {
+      // Get current user data from Firestore
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const currentPhotoURL = userDoc.exists() ?
+        userDoc.data().photoURL :
+        user.photoURL;
+
       await addDoc(messagesRef, {
         text: newMessage,
         audioURL: audioURL || null,
@@ -499,11 +526,8 @@ export function ChatRoom() {
         timestamp: serverTimestamp(),
         uid: user.uid,
         displayName: user.displayName,
-        photoURL:
-          user.photoURL ||
-          "https://ui-avatars.com/api/?name=" +
-          encodeURIComponent(user.displayName || "U") +
-          "&background=random",
+        photoURL: currentPhotoURL ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || "U")}&background=random`,
       });
 
       setNewMessage("");
@@ -758,19 +782,17 @@ export function ChatRoom() {
                     )}
                     <img
                       src={
-                        profilePicUrl || // This will show the Base64 image if available
-                        auth.currentUser?.photoURL || // Fallback to auth photoURL
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                          userFullName || "U"
-                        )}&background=random`
+                        userDocs[message.uid]?.data()?.photoURL || // Current profile picture from Firestore
+                        message.photoURL ||                        // Fallback to message's original photoURL
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(message.displayName || "U")}&background=random`
                       }
                       alt="User profile"
-                      className="w-8 h-8 rounded-full border border-gray-200"
+                      className={`w-5 h-5 rounded-full object-cover border-2 ${message.uid === user.uid ? "border-blue-500" : "border-gray-300"
+                        }`}
                       onError={(e) => {
-                        e.target.src =
-                          "https://ui-avatars.com/api/?name=U&background=random";
+                        e.target.src = "https://ui-avatars.com/api/?name=U&background=random";
                       }}
-                    />
+                    />  
                   </div>
                 </div>
               </div>
