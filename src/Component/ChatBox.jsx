@@ -15,7 +15,7 @@ import {
 
 } from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
-import { db,uploadImageToImgBB  } from "../firebase";
+import { db, uploadImageToImgBB } from "../firebase";
 
 export default function ChatBox() {
   const [userFullName, setUserFullName] = useState("");
@@ -575,36 +575,51 @@ export default function ChatBox() {
         </div>
 
         {/* Search Section */}
-        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
-          <h2 className="text-lg font-medium text-gray-700 mb-3">Find a Room</h2>
-          <div className="flex space-x-2">
+        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 w-full max-w-2xl mx-auto">
+          <h2 className="text-lg font-medium text-gray-700 mb-3 text-center sm:text-left">Find a Room</h2>
+
+          <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
             <input
               type="text"
               placeholder="Search by Room ID or Name"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
             />
             <button
               onClick={handleSearch}
               disabled={searching}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
             >
               {searching ? (
-                <span className="inline-flex items-center">
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <span className="inline-flex items-center justify-center">
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
                   </svg>
                   Searching
                 </span>
-              ) : "Search"}
+              ) : (
+                "Search"
+              )}
             </button>
           </div>
 
           {searchResult && (
-            <div className={`mt-3 ${searchResult.length > 0 ? 'bg-blue-50' : 'bg-red-50'} p-3 rounded-md border ${searchResult.length > 0 ? 'border-blue-200' : 'border-red-200'}`}>
+            <div
+              className={`mt-4 ${searchResult.length > 0 ? "bg-blue-50 border-blue-200" : "bg-red-50 border-red-200"
+                } p-3 rounded-md border`}
+            >
               {searchResult.length > 0 ? (
                 <>
                   <h3 className="text-sm font-medium text-gray-700 mb-2">Matching Rooms:</h3>
