@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate,useLocation } from "react-router-dom";
 import { auth } from "../firebase";
 import { signOut, updatePassword, updateProfile } from "firebase/auth";
 import {
@@ -12,10 +12,11 @@ import {
   query,
   where,
   updateDoc,
-
 } from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
 import { db, uploadImageToImgBB } from "../firebase";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 export default function ChatBox() {
   const [userFullName, setUserFullName] = useState("");
@@ -44,6 +45,21 @@ export default function ChatBox() {
   const dropdownRef = useRef(null);
   const modalRef = useRef(null);
 
+  // Validate group name
+  const validateGroupName = (name) => {
+    if (!name.trim()) {
+      return "Please enter a group name";
+    }
+    
+    // Check for special characters using regex
+    const specialChars = /[`!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/;
+    if (specialChars.test(name)) {
+      return "Group name cannot contain special characters";
+    }
+    
+    return null;
+  };
+
   // Fetch user data from Firestore
   useEffect(() => {
     const fetchUserData = async () => {
@@ -56,7 +72,6 @@ export default function ChatBox() {
               auth.currentUser.displayName ||
               "User"
             );
-            // Store the photoBase64 in state if it exists
             if (userDoc.data().photoBase64) {
               setProfilePicUrl(userDoc.data().photoBase64);
             }
@@ -119,48 +134,80 @@ export default function ChatBox() {
 
   const handleUpdateName = async (e) => {
     e.preventDefault();
-
-    if (!newDisplayName.trim()) {
+  
+    // Trim and validate name
+    const trimmedName = newDisplayName.trim();
+    
+    if (!trimmedName) {
       setNameError("Name cannot be empty");
       return;
     }
-
+  
+    // Check for special characters (only allow letters, numbers, and spaces)
+    if (/[^a-zA-Z0-9 ]/.test(trimmedName)) {
+      setNameError("Name cannot contain special characters");
+      return;
+    }
+  
     try {
       setIsUpdatingName(true);
       const user = auth.currentUser;
-
+  
       // Update in Firestore
       await updateDoc(doc(db, "users", user.uid), {
-        displayName: newDisplayName.trim()
+        displayName: trimmedName
       });
-
+  
       // Update in Auth
       await updateProfile(user, {
-        displayName: newDisplayName.trim()
+        displayName: trimmedName
       });
-
+  
       // Update local state
-      setUserFullName(newDisplayName.trim());
+      setUserFullName(trimmedName);
       setShowNameModal(false);
       setNewDisplayName("");
+      
+      // Show success toast
+      toast.success("Name updated successfully! ✅", {
+        position: "top-center",
+        autoClose: 3000,
+      });
     } catch (error) {
       console.error("Error updating name:", error);
       setNameError(error.message);
+      toast.error("Failed to update name ❌", {
+        position: "top-center",
+        autoClose: 3000,
+      });
     } finally {
       setIsUpdatingName(false);
     }
   };
-
   const handleCreateRoom = async () => {
-    if (!groupName.trim()) {
-      setJoinError("Please enter a group name");
+    const validationError = validateGroupName(groupName);
+    if (validationError) {
+      setJoinError(validationError);
       return;
     }
 
     setCreating(true);
-    const roomId = uuidv4().slice(0, 8);
+    setJoinError("");
 
     try {
+      // Check if a room with this name already exists
+      const roomsRef = collection(db, "rooms");
+      const q = query(roomsRef, where("name", "==", groupName.trim()));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        setJoinError("A room with this name already exists");
+        setCreating(false);
+        return;
+      }
+
+      const roomId = uuidv4().slice(0, 8);
+
       await setDoc(doc(db, "rooms", roomId), {
         name: groupName.trim(),
         createdAt: serverTimestamp(),
@@ -168,9 +215,17 @@ export default function ChatBox() {
       setCreatedRoomId(roomId);
       localStorage.setItem("createdRoomId", roomId);
       navigate(`/chat/${roomId}`);
+      toast.success("Room created successfully!", {
+        position: "top-center",
+        autoClose: 3000,
+      });
     } catch (error) {
       console.error("Error creating room:", error);
       setJoinError("Failed to create room. Please try again.");
+      toast.error("Failed to create room", {
+        position: "top-center",
+        autoClose: 3000,
+      });
     } finally {
       setCreating(false);
     }
@@ -189,12 +244,24 @@ export default function ChatBox() {
 
       if (docSnap.exists()) {
         navigate(`/chat/${roomId}`);
+        toast.success("Joined room successfully!", {
+          position: "top-center",
+          autoClose: 3000,
+        });
       } else {
         setJoinError("Invalid Room ID. Room does not exist.");
+        toast.error("Room not found", {
+          position: "top-center",
+          autoClose: 3000,
+        });
       }
     } catch (error) {
       console.error("Error checking room:", error);
       setJoinError("Something went wrong. Please try again.");
+      toast.error("Failed to join room", {
+        position: "top-center",
+        autoClose: 3000,
+      });
     }
   };
 
@@ -231,9 +298,19 @@ export default function ChatBox() {
       });
 
       setSearchResult(matches);
+      if (matches.length === 0) {
+        toast.info("No rooms found matching your search", {
+          position: "top-center",
+          autoClose: 3000,
+        });
+      }
     } catch (error) {
       console.error("Search error:", error);
       setSearchResult([]);
+      toast.error("Search failed", {
+        position: "top-center",
+        autoClose: 3000,
+      });
     } finally {
       setSearching(false);
     }
@@ -247,27 +324,38 @@ export default function ChatBox() {
       setIsUpdatingProfile(true);
       const user = auth.currentUser;
 
-      // Upload to ImgBB (reuse the function from firebase.js)
+      // Upload to ImgBB
       const imageURL = await uploadImageToImgBB(file);
 
       // Update Firebase Auth profile
       await updateProfile(user, { photoURL: imageURL });
 
-      // Update Firestore (replace Base64 with URL)
+      // Update Firestore
       await updateDoc(doc(db, "users", user.uid), {
         photoURL: imageURL,
-        photoBase64: null, // Remove Base64 if it exists
+        photoBase64: null,
       });
 
       // Update local state
       setProfilePicUrl(imageURL);
+      
+      // Show success toast
+      toast.success("Profile picture updated!", {
+        position: "top-center",
+        autoClose: 3000,
+      });
     } catch (error) {
       console.error("Error updating profile picture:", error);
       setJoinError("Failed to update profile picture");
+      toast.error("Failed to update profile picture", {
+        position: "top-center",
+        autoClose: 3000,
+      });
     } finally {
       setIsUpdatingProfile(false);
     }
   };
+
   const handlePasswordReset = async (e) => {
     e.preventDefault();
 
@@ -288,10 +376,19 @@ export default function ChatBox() {
       setNewPassword("");
       setConfirmPassword("");
       setShowPasswordModal(false);
-      alert("Password updated successfully!");
+      
+      // Show success toast
+      toast.success("Password updated successfully!", {
+        position: "top-center",
+        autoClose: 3000,
+      });
     } catch (error) {
       console.error("Error updating password:", error);
       setPasswordError(error.message);
+      toast.error("Failed to update password", {
+        position: "top-center",
+        autoClose: 3000,
+      });
     } finally {
       setIsUpdatingPassword(false);
     }
@@ -304,30 +401,32 @@ export default function ChatBox() {
       </div>
     );
   }
-
   return (
     <div className="min-h-screen relative flex flex-col items-center justify-center bg-gray-50 p-6">
+      <ToastContainer position="top-center" autoClose={3000} />
       {/* Profile Dropdown */}
       <div className="absolute top-4 right-4">
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setShowDropdown(!showDropdown)}
-            className="flex items-center space-x-1 focus:outline-none"
+            className="flex items-center gap-3 px-3 py-1.5 bg-white border border-gray-200 rounded-full shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none"
           >
             <img
               src={
-                profilePicUrl || // ImgBB URL (now used instead of Base64)
-                auth.currentUser?.photoURL || // Fallback to Auth
+                profilePicUrl ||
+                auth.currentUser?.photoURL ||
                 `https://ui-avatars.com/api/?name=${encodeURIComponent(userFullName || "U")}`
               }
               alt="User profile"
-              className="w-8 h-8 rounded-full border border-gray-200"
+              className="w-9 h-9 rounded-full border border-gray-300 object-cover"
               onError={(e) => {
                 e.target.src = "https://ui-avatars.com/api/?name=U&background=random";
               }}
             />
+            <span className="text-sm font-medium text-gray-800 whitespace-nowrap max-w-[120px] truncate hidden sm:inline-block">
+              {userFullName}
+            </span>
           </button>
-
           {showDropdown && (
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
               <div className="px-4 py-2 text-sm text-gray-700 border-b border-gray-100">
@@ -651,7 +750,6 @@ export default function ChatBox() {
           )}
         </div>
 
-
         {/* Room Management Section */}
         <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 space-y-4">
           <h2 className="text-lg font-medium text-gray-700">Room Management</h2>
@@ -664,8 +762,14 @@ export default function ChatBox() {
               type="text"
               id="groupName"
               value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              placeholder="Enter group name"
+              onChange={(e) => {
+                const value = e.target.value;
+                const specialChars = /[`!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/;
+                if (!specialChars.test(value)) {
+                  setGroupName(value);
+                }
+              }}
+              placeholder="Enter group name (no special characters)"
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
               required
             />
@@ -697,6 +801,10 @@ export default function ChatBox() {
             </div>
           )}
 
+          {joinError && (
+            <p className="text-sm text-red-600 text-center">{joinError}</p>
+          )}
+
           <form onSubmit={handleJoinRoom} className="space-y-3">
             <div>
               <label htmlFor="roomId" className="block text-sm font-medium text-gray-700 mb-1">Join Existing Room</label>
@@ -715,9 +823,6 @@ export default function ChatBox() {
             >
               Join Room
             </button>
-            {joinError && (
-              <p className="text-sm text-red-600 text-center">{joinError}</p>
-            )}
           </form>
         </div>
       </div>

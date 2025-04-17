@@ -633,36 +633,29 @@ export function ChatRoom() {
             <h1 className="text-lg font-semibold text-gray-800">Room Name: {roomName}</h1>
           </div>
           <div className="flex items-center space-x-3">
-            <button
-              onClick={handleExitRoom}
-              className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm flex items-center"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-              </svg>
-              Exit Room
-            </button>
+
+
 
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
-                className="flex items-center space-x-1 focus:outline-none"
+                className="flex items-center gap-3 px-3 py-1.5 bg-white border border-gray-200 rounded-full shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none"
               >
                 <img
                   src={
-                    profilePicUrl || // This will show the Base64 image if available
-                    auth.currentUser?.photoURL || // Fallback to auth photoURL
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                      userFullName || "U"
-                    )}&background=random`
+                    profilePicUrl ||
+                    auth.currentUser?.photoURL ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(userFullName || "U")}`
                   }
                   alt="User profile"
-                  className="w-8 h-8 rounded-full border border-gray-200"
+                  className="w-9 h-9 rounded-full border border-gray-300 object-cover"
                   onError={(e) => {
-                    e.target.src =
-                      "https://ui-avatars.com/api/?name=U&background=random";
+                    e.target.src = "https://ui-avatars.com/api/?name=U&background=random";
                   }}
                 />
+                <span className="text-sm font-medium text-gray-800 whitespace-nowrap max-w-[120px] truncate hidden sm:inline-block">
+                  {userFullName}
+                </span>
               </button>
 
               {showDropdown && (
@@ -677,9 +670,20 @@ export function ChatRoom() {
                   >
                     Sign Out
                   </button>
+
                 </div>
+
               )}
             </div>
+            <button
+              onClick={handleExitRoom}
+              className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm flex items-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+              </svg>
+              Exit Room
+            </button>
           </div>
         </div>
       </div>

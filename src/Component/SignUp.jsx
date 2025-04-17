@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { signUpWithEmail } from "../firebase"; // Ensure you import the firebase methods
+import { signUpWithEmail } from "../firebase";
+import { toast } from 'react-toastify';
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -22,74 +23,92 @@ export default function SignUp() {
 
     setAuthError("");
 
-    // Validate image file type
     if (!file.type.match('image.(jpeg|jpg|png)')) {
       setAuthError("Please select a valid image (JPEG/PNG only)");
       return;
     }
 
-    // Validate image file size
-    if (file.size > 2 * 1024 * 1024) { // 2MB max size
+    if (file.size > 2 * 1024 * 1024) {
       setAuthError("Image size must be less than 2MB");
       return;
     }
 
     try {
       setIsUploading(true);
-
-      // Upload image to ImgBB (you can use your ImgBB API here)
       const imageURL = await uploadImageToImgBB(file);
-      setProfilePicUrl(imageURL); // Store the image URL
+      setProfilePicUrl(imageURL);
+
+      toast.success('Profile picture updated successfully!', {
+        position: "top-center",
+        autoClose: 2500,
+      });
 
     } catch (error) {
       console.error("Image upload error:", error);
       setAuthError("Failed to upload image");
+      toast.error('Failed to update profile picture ', {
+        position: "top-center",
+        autoClose: 2500,
+      });
     } finally {
       setIsUploading(false);
     }
   };
 
-  // Upload image to ImgBB and return the URL
   const uploadImageToImgBB = async (file) => {
     const formData = new FormData();
     formData.append('image', file);
 
-    try {
-      const response = await fetch(
-        `https://api.imgbb.com/1/upload?key=${process.env.REACT_APP_IMGBB_API_KEY}`,
-        {
-          method: "POST",
-          body: formData
-        }
-      );
-      const data = await response.json();
-      if (data.success) {
-        return data.data.url; // Return the URL of the uploaded image
-      } else {
-        throw new Error("Image upload failed");
+    const response = await fetch(
+      `https://api.imgbb.com/1/upload?key=${process.env.REACT_APP_IMGBB_API_KEY}`,
+      {
+        method: "POST",
+        body: formData
       }
-    } catch (error) {
-      throw error;
+    );
+    const data = await response.json();
+    if (data.success) {
+      return data.data.url;
     }
+    throw new Error("Image upload failed");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setAuthError("");
 
-    // Validation checks
-    if (!formData.name.trim()) {
+    const trimmedName = formData.name.trim();
+
+    if (!trimmedName) {
       setAuthError("Please enter your full name");
       return;
     }
+
+    if (trimmedName.length < 5) {
+      setAuthError("Name must be at least 5 characters");
+      return;
+    }
+
+    if (trimmedName.length > 15) {
+      setAuthError("Name should not exceed 15 characters");
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9 ]+$/.test(trimmedName)) {
+      setAuthError("Name should not contain special characters");
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setAuthError("Passwords do not match");
       return;
     }
-    if (formData.password.length < 6) {
-      setAuthError("Password must be at least 6 characters");
+
+    if (formData.password.length < 8 || formData.password.length > 16) {
+      setAuthError("Password must be between 8 and 16 characters");
       return;
     }
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       setAuthError("Please enter a valid email address");
       return;
@@ -97,17 +116,25 @@ export default function SignUp() {
 
     try {
       setIsSubmitting(true);
-
-      // Sign up user with email, password, name, and profile picture URL
-      const user = await signUpWithEmail(
+      await signUpWithEmail(
         formData.email,
         formData.password,
-        formData.name,
-        profilePicUrl // Send profilePicUrl to save in Firebase Authentication and Firestore
+        trimmedName,
+        profilePicUrl
       );
 
-      // After successful sign-up, redirect to dashboard
-      navigate("/dashboard");
+      setTimeout(() => {
+        toast.success('Account created successfully!', {
+          position: "top-center",
+          autoClose: 2500,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+          onClose: () => navigate("/chat")
+        });
+      }, 800);
 
     } catch (error) {
       console.error("Sign up error:", error);
@@ -124,6 +151,13 @@ export default function SignUp() {
         default:
           setAuthError("Account creation failed. Please try again.");
       }
+
+      setTimeout(() => {
+        toast.error(error.message || 'Account creation failed 😢', {
+          position: "top-center",
+          autoClose: 2500,
+        });
+      }, 600);
     } finally {
       setIsSubmitting(false);
     }
@@ -138,7 +172,6 @@ export default function SignUp() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 px-4">
       <div className="w-full max-w-md p-10 bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="flex flex-col items-center mb-6">
-          {/* Profile Picture Preview */}
           <div className="relative mb-4 group">
             <div className="h-24 w-24 rounded-full overflow-hidden border-2 border-gray-200">
               {profilePicUrl ? (
@@ -203,6 +236,7 @@ export default function SignUp() {
               placeholder="Full Name"
               value={formData.name}
               onChange={handleChange}
+              maxLength={15}
               className="w-full px-4 py-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
               required
             />
