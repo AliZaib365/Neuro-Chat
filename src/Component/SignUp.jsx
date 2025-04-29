@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { signUpWithEmail } from "../firebase";
-import { toast } from 'react-toastify';
+import { signUpWithEmail } from "../firebase"; // Ensure you import the firebase methods
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -23,92 +24,82 @@ export default function SignUp() {
 
     setAuthError("");
 
+    // Validate image file type
     if (!file.type.match('image.(jpeg|jpg|png)')) {
       setAuthError("Please select a valid image (JPEG/PNG only)");
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
+    // Validate image file size (5MB limit in code comment is an error; message still says 2MB)
+    if (file.size > 5 * 1024 * 1024) {
       setAuthError("Image size must be less than 2MB");
       return;
     }
 
     try {
       setIsUploading(true);
-      const imageURL = await uploadImageToImgBB(file);
-      setProfilePicUrl(imageURL);
 
-      toast.success('Profile picture updated successfully!', {
-        position: "top-center",
-        autoClose: 2500,
-      });
+      // Upload image to ImgBB (you can use your ImgBB API here)
+      const imageURL = await uploadImageToImgBB(file);
+      setProfilePicUrl(imageURL); // Store the image URL
+      toast.success("Profile picture uploaded successfully!"); // Toast notification
 
     } catch (error) {
       console.error("Image upload error:", error);
       setAuthError("Failed to upload image");
-      toast.error('Failed to update profile picture ', {
-        position: "top-center",
-        autoClose: 2500,
-      });
+      toast.error("Failed to upload profile picture."); // Toast notification
     } finally {
       setIsUploading(false);
     }
   };
 
+  // Upload image to ImgBB and return the URL
   const uploadImageToImgBB = async (file) => {
-    const formData = new FormData();
-    formData.append('image', file);
+    const uploadFormData = new FormData();
+    uploadFormData.append('image', file);
 
-    const response = await fetch(
-      `https://api.imgbb.com/1/upload?key=${process.env.REACT_APP_IMGBB_API_KEY}`,
-      {
-        method: "POST",
-        body: formData
+    try {
+      const response = await fetch(
+        `https://api.imgbb.com/1/upload?key=${process.env.REACT_APP_IMGBB_API_KEY}`,
+        {
+          method: "POST",
+          body: uploadFormData
+        }
+      );
+      const data = await response.json();
+      if (data.success) {
+        return data.data.url; // Return the URL of the uploaded image
+      } else {
+        throw new Error("Image upload failed");
       }
-    );
-    const data = await response.json();
-    if (data.success) {
-      return data.data.url;
+    } catch (error) {
+      throw error;
     }
-    throw new Error("Image upload failed");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setAuthError("");
 
-    const trimmedName = formData.name.trim();
+    // Validation checks
+    const usernameRegex = /^[a-zA-Z0-9]{1,8}$/; // Only letters and numbers, max 8 characters
 
-    if (!trimmedName) {
+    if (!formData.name.trim()) {
       setAuthError("Please enter your full name");
       return;
     }
-
-    if (trimmedName.length < 5) {
-      setAuthError("Name must be at least 5 characters");
+    if (!usernameRegex.test(formData.name)) {
+      setAuthError("Username must be alphanumeric and up to 8 characters only");
       return;
     }
-
-    if (trimmedName.length > 15) {
-      setAuthError("Name should not exceed 15 characters");
-      return;
-    }
-
-    if (!/^[a-zA-Z0-9 ]+$/.test(trimmedName)) {
-      setAuthError("Name should not contain special characters");
-      return;
-    }
-
     if (formData.password !== formData.confirmPassword) {
       setAuthError("Passwords do not match");
       return;
     }
-
-    if (formData.password.length < 8 || formData.password.length > 16) {
-      setAuthError("Password must be between 8 and 16 characters");
+    if (formData.password.length < 6) {
+      setAuthError("Password must be at least 6 characters");
       return;
     }
-
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       setAuthError("Please enter a valid email address");
       return;
@@ -116,25 +107,18 @@ export default function SignUp() {
 
     try {
       setIsSubmitting(true);
+
+      // Sign up user with email, password, name, and profile picture URL
       await signUpWithEmail(
         formData.email,
         formData.password,
-        trimmedName,
-        profilePicUrl
+        formData.name,
+        profilePicUrl // Send profilePicUrl to save in Firebase Authentication and Firestore
       );
 
-      setTimeout(() => {
-        toast.success('Account created successfully!', {
-          position: "top-center",
-          autoClose: 2500,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
-          onClose: () => navigate("/chat")
-        });
-      }, 800);
+      // Show success toast and redirect
+      toast.success("Account created successfully!");
+      navigate("/dashboard");
 
     } catch (error) {
       console.error("Sign up error:", error);
@@ -151,16 +135,17 @@ export default function SignUp() {
         default:
           setAuthError("Account creation failed. Please try again.");
       }
-
-      setTimeout(() => {
-        toast.error(error.message || 'Account creation failed 😢', {
-          position: "top-center",
-          autoClose: 2500,
-        });
-      }, 600);
+      toast.error(authError || "Account creation failed."); // Toast notification
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Dummy handler for joining a room
+  const handleJoinRoom = (e) => {
+    e.preventDefault();
+    // Your logic to join room can be added here.
+    toast.info("Join Room functionality is not implemented yet.");
   };
 
   const handleChange = (e) => {
@@ -168,10 +153,16 @@ export default function SignUp() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const goBackToLogin = () => {
+    navigate("/login");
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 px-4">
+      <ToastContainer position="top-right" autoClose={3000} />
       <div className="w-full max-w-md p-10 bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="flex flex-col items-center mb-6">
+          {/* Profile Picture Preview */}
           <div className="relative mb-4 group">
             <div className="h-24 w-24 rounded-full overflow-hidden border-2 border-gray-200">
               {profilePicUrl ? (
@@ -236,7 +227,6 @@ export default function SignUp() {
               placeholder="Full Name"
               value={formData.name}
               onChange={handleChange}
-              maxLength={15}
               className="w-full px-4 py-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
               required
             />
@@ -298,6 +288,16 @@ export default function SignUp() {
             )}
           </button>
         </form>
+
+        {/* Back Button to Login using the same style as the main buttons */}
+        <div className="flex justify-center">
+          <button
+            onClick={goBackToLogin}
+            className="w-full px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center transition-colors"
+          >
+            Back to Login
+          </button>
+        </div>
       </div>
     </div>
   );

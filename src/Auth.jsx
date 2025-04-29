@@ -8,7 +8,7 @@ import { auth, signInWithGoogle } from "./firebase";
 import ChatBox from "./Component/ChatBox";
 import { ChatRoom } from "./Component/ChatRoom";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
-import SignUp from "./Component/SignUp"; // Make sure this path is correct
+import SignUp from "./Component/SignUp"; // Ensure the path is correct
 
 function App() {
   const [user, loading] = useAuthState(auth);
@@ -27,26 +27,25 @@ function App() {
   useEffect(() => {
     if (!isAuthChecked) return;
 
-    if (!user && location.pathname !== "/" && location.pathname !== "/sign-in") {
-      navigate("/", { replace: true });
+    // Check for a redirect query (e.g., ?redirect=roomId)
+    const redirectToRoom = new URLSearchParams(location.search).get('redirect');
+
+    if (!user && redirectToRoom) {
+      // Redirect to login page with redirect query
+      navigate(`/?redirect=${redirectToRoom}`, { replace: true });
     }
 
-    if (user && (location.pathname === "/" || location.pathname === "/sign-in")) {
+    if (user && redirectToRoom) {
+      // Redirect logged-in user to the room
+      navigate(`/chat/${redirectToRoom}`, { replace: true });
+    } else if (!user && location.pathname !== "/" && location.pathname !== "/sign-in") {
+      // Redirect unauthenticated users to the login page
+      navigate("/", { replace: true });
+    } else if (user && (location.pathname === "/" || location.pathname === "/sign-in")) {
+      // Redirect authenticated users to the default chat box page
       navigate("/box", { replace: true });
     }
-
-    if (user) {
-      const isOnBox = location.pathname === "/box";
-      const isOnChat = location.pathname.startsWith("/chat/");
-      if (!isOnBox && !isOnChat) {
-        navigate("/box", { replace: true });
-      }
-    }
   }, [isAuthChecked, user, location.pathname, navigate]);
-
-  if (!isAuthChecked) {
-    return null;
-  }
 
   // Handle email login
   const handleEmailSignIn = async () => {
@@ -62,6 +61,10 @@ function App() {
   const navigateToSignIn = () => {
     navigate("/sign-in");
   };
+
+  if (!isAuthChecked) {
+    return null;
+  }
 
   // Login Screen
   if (!user && location.pathname === "/") {
@@ -123,8 +126,6 @@ function App() {
             />
             <span className="font-medium">Continue with Google</span>
           </button>
-
-          
         </div>
       </div>
     );

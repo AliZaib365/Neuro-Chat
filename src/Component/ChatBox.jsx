@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate,useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { auth } from "../firebase";
 import { signOut, updatePassword, updateProfile } from "firebase/auth";
 import {
@@ -19,6 +19,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 export default function ChatBox() {
+  const [shareableLink, setShareableLink] = useState(null);
   const [userFullName, setUserFullName] = useState("");
   const [profilePicUrl, setProfilePicUrl] = useState("");
   const [joinError, setJoinError] = useState("");
@@ -41,6 +42,8 @@ export default function ChatBox() {
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [isUpdatingName, setIsUpdatingName] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+
   const fileInputRef = useRef(null);
   const dropdownRef = useRef(null);
   const modalRef = useRef(null);
@@ -88,7 +91,7 @@ export default function ChatBox() {
     fetchUserData();
   }, []);
 
-  // Close dropdown when clicking outside
+  // Close dropdown and modals when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -184,6 +187,15 @@ export default function ChatBox() {
       setIsUpdatingName(false);
     }
   };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success("Link copied to clipboard!");
+    }).catch(() => {
+      toast.error("Failed to copy link.");
+    });
+  };
+
   const handleCreateRoom = async () => {
     const validationError = validateGroupName(groupName);
     if (validationError) {
@@ -207,14 +219,20 @@ export default function ChatBox() {
       }
 
       const roomId = uuidv4().slice(0, 8);
-
       await setDoc(doc(db, "rooms", roomId), {
         name: groupName.trim(),
         createdAt: serverTimestamp(),
       });
       setCreatedRoomId(roomId);
       localStorage.setItem("createdRoomId", roomId);
-      navigate(`/chat/${roomId}`);
+
+      // Construct the shareable link.
+      // This link will be used to directly join the room. If the user is logged in, they go directly into the room.
+      // Otherwise, they are redirected to login first, with the redirect query parameter set.
+      const link = `${window.location.origin}/chat/${roomId}`;
+      setShareableLink(link);
+      setShowLinkModal(true);
+
       toast.success("Room created successfully!", {
         position: "top-center",
         autoClose: 3000,
@@ -243,7 +261,12 @@ export default function ChatBox() {
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        navigate(`/chat/${roomId}`);
+        // If the user is not logged in, redirect to login with the redirect set to the chat room.
+        if (!auth.currentUser) {
+          navigate(`/login?redirect=/chat/${roomId}`);
+        } else {
+          navigate(`/chat/${roomId}`);
+        }
         toast.success("Joined room successfully!", {
           position: "top-center",
           autoClose: 3000,
@@ -356,6 +379,16 @@ export default function ChatBox() {
     }
   };
 
+  // This function handles the "Enter Room" action from the shareable link modal.
+  const navigateToChat = () => {
+    if (!auth.currentUser) {
+      // Redirect to login page with redirect query parameter pointing to the room.
+      navigate(`/login?redirect=/chat/${createdRoomId}`);
+    } else {
+      navigate(`/chat/${createdRoomId}`);
+    }
+  };
+
   const handlePasswordReset = async (e) => {
     e.preventDefault();
 
@@ -401,6 +434,7 @@ export default function ChatBox() {
       </div>
     );
   }
+
   return (
     <div className="min-h-screen relative flex flex-col items-center justify-center bg-gray-50 p-6">
       <ToastContainer position="top-center" autoClose={3000} />
@@ -433,7 +467,6 @@ export default function ChatBox() {
                 <p className="font-medium">{userFullName}</p>
                 <p className="text-gray-500 text-xs truncate">{auth.currentUser?.email}</p>
               </div>
-
               <button
                 onClick={() => fileInputRef.current.click()}
                 className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
@@ -458,7 +491,6 @@ export default function ChatBox() {
                 accept="image/*"
                 className="hidden"
               />
-
               <button
                 onClick={() => {
                   setShowNameModal(true);
@@ -472,7 +504,6 @@ export default function ChatBox() {
                 </svg>
                 Edit Display Name
               </button>
-
               <button
                 onClick={() => {
                   setShowPasswordModal(true);
@@ -485,7 +516,6 @@ export default function ChatBox() {
                 </svg>
                 Reset Password
               </button>
-
               <button
                 onClick={() => signOut(auth)}
                 className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t border-gray-100 flex items-center"
@@ -519,7 +549,6 @@ export default function ChatBox() {
                 </svg>
               </button>
             </div>
-
             <form onSubmit={handleUpdateName}>
               <div className="space-y-4">
                 <div className="relative">
@@ -532,11 +561,9 @@ export default function ChatBox() {
                     required
                   />
                 </div>
-
                 {nameError && (
                   <p className="text-sm text-red-600">{nameError}</p>
                 )}
-
                 <div className="flex justify-end space-x-3 pt-2">
                   <button
                     type="button"
@@ -591,7 +618,6 @@ export default function ChatBox() {
                 </svg>
               </button>
             </div>
-
             <form onSubmit={handlePasswordReset}>
               <div className="space-y-4">
                 <div>
@@ -608,7 +634,6 @@ export default function ChatBox() {
                     required
                   />
                 </div>
-
                 <div>
                   <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
                     Confirm Password
@@ -623,11 +648,9 @@ export default function ChatBox() {
                     required
                   />
                 </div>
-
                 {passwordError && (
                   <p className="text-sm text-red-600">{passwordError}</p>
                 )}
-
                 <div className="flex justify-end space-x-3 pt-2">
                   <button
                     type="button"
@@ -663,6 +686,7 @@ export default function ChatBox() {
         </div>
       )}
 
+      {/* Main Content */}
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center">
@@ -676,7 +700,6 @@ export default function ChatBox() {
         {/* Search Section */}
         <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 w-full max-w-2xl mx-auto">
           <h2 className="text-lg font-medium text-gray-700 mb-3">Find a Room</h2>
-
           <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
             <input
               type="text"
@@ -720,12 +743,9 @@ export default function ChatBox() {
               )}
             </button>
           </div>
-
           {searchResult && (
             <div
-              className={`mt-3 ${searchResult.length > 0 ? 'bg-blue-50' : 'bg-red-50'
-                } p-3 rounded-md border ${searchResult.length > 0 ? 'border-blue-200' : 'border-red-200'
-                }`}
+              className={`mt-3 ${searchResult.length > 0 ? 'bg-blue-50' : 'bg-red-50'} p-3 rounded-md border ${searchResult.length > 0 ? 'border-blue-200' : 'border-red-200'}`}
             >
               {searchResult.length > 0 ? (
                 <>
@@ -753,7 +773,6 @@ export default function ChatBox() {
         {/* Room Management Section */}
         <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 space-y-4">
           <h2 className="text-lg font-medium text-gray-700">Room Management</h2>
-
           <div>
             <label htmlFor="groupName" className="block text-sm font-medium text-gray-700 mb-1">
               Group Name
@@ -774,12 +793,10 @@ export default function ChatBox() {
               required
             />
           </div>
-
           <button
             onClick={handleCreateRoom}
-            disabled={creating || !groupName.trim()}
-            className={`w-full py-2.5 px-4 rounded-md text-white font-medium flex items-center justify-center ${creating ? 'bg-green-500' : 'bg-green-600 hover:bg-green-700'
-              } transition-colors ${!groupName.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={creating}
+            className={`w-full py-2.5 px-4 rounded-md text-white font-medium flex items-center justify-center ${creating ? 'bg-green-500' : 'bg-green-600 hover:bg-green-700'} transition-colors`}
           >
             {creating ? (
               <>
@@ -789,25 +806,16 @@ export default function ChatBox() {
                 </svg>
                 Creating Room...
               </>
-            ) : 'Create New Room'}
+            ) : "Create New Room"}
           </button>
-
-          {createdRoomId && (
-            <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
-              <p className="text-sm font-medium text-gray-700">Your Room:</p>
-              <p className="font-semibold text-lg text-blue-600 my-1">{groupName}</p>
-              <p className="font-mono text-sm text-gray-700">ID: {createdRoomId}</p>
-              <p className="text-xs text-gray-500 mt-1">Share this ID with participants</p>
-            </div>
-          )}
-
           {joinError && (
             <p className="text-sm text-red-600 text-center">{joinError}</p>
           )}
-
           <form onSubmit={handleJoinRoom} className="space-y-3">
             <div>
-              <label htmlFor="roomId" className="block text-sm font-medium text-gray-700 mb-1">Join Existing Room</label>
+              <label htmlFor="roomId" className="block text-sm font-medium text-gray-700 mb-1">
+                Join Existing Room
+              </label>
               <input
                 type="text"
                 id="roomId"
@@ -826,6 +834,44 @@ export default function ChatBox() {
           </form>
         </div>
       </div>
+
+      {/* Shareable Link Modal */}
+      {showLinkModal && shareableLink && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-medium text-gray-800 mb-4">Room Created Successfully!</h3>
+            <p className="text-sm text-gray-700 mb-3">Share this link with participants. When they click it, they will join the room automatically. If they're not logged in, they'll be prompted to log in first.</p>
+            <div className="flex items-center space-x-2 mb-4">
+              <input
+                type="text"
+                readOnly
+                value={shareableLink}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={() => copyToClipboard(shareableLink)}
+                className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Copy
+              </button>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowLinkModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
+              <button
+                onClick={navigateToChat}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+              >
+                Enter Room
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
